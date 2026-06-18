@@ -277,139 +277,269 @@ async function generateDeck({ topic, style, absurdity, audience, count, cfg, onP
     slides.push(...part);
   }
   onProgress({ label: "正在加盖公章…", pct: 98 });
-  return { title: meta.title, subtitle: meta.subtitle, presenter: meta.presenter, slides };
+  return { title: meta.title, subtitle: meta.subtitle, presenter: meta.presenter, slides, style };
 }
 
 /* ================= 幻灯片组件 ================= */
-function Seal() {
+function themeOf(deck) { return THEMES[(deck && deck.style)] || THEMES["学术研讨"]; }
+
+const THEMES = {
+  "学术研讨": { variant: "academic", bg: "#FFFFFF", fg: "#16202E", muted: "#6C6A61",
+    accent: "#A93A30", accent2: "#2E5A88", line: "#D7D2C4",
+    display: "Georgia, 'Songti SC','SimSun', serif", body: "system-ui, sans-serif",
+    chart: ["#2E5A88","#A93A30","#B0852F","#4F7A4F","#7A5C8A"], eyebrow: "胡言研究院 · 内部资料" },
+  "政府白皮书": { variant: "gov", bg: "#FFFFFF", fg: "#1A1A1A", muted: "#8A2B2B",
+    accent: "#C0252B", accent2: "#C0252B", line: "#E6CBCB",
+    display: "'Songti SC','SimSun','STSong', serif", body: "'Songti SC','SimSun', serif",
+    chart: ["#C0252B","#9A1B20","#D98A8C","#B0852F","#7A1F1F"], eyebrow: "胡研发〔2024〕第 7 号" },
+  "TED演讲": { variant: "ted", bg: "#0B0B0B", fg: "#FFFFFF", muted: "#9A9A9A",
+    accent: "#E62B1E", accent2: "#E62B1E", line: "#2A2A2A",
+    display: "'Helvetica Neue', Arial, system-ui, sans-serif", body: "'Helvetica Neue', system-ui, sans-serif",
+    chart: ["#E62B1E","#FFFFFF","#9A9A9A","#E6772B","#E6B82B"], eyebrow: "TEDx · 胡言研究院" },
+  "商业路演": { variant: "business", bg: "linear-gradient(135deg,#0A1322 0%,#0E2138 55%,#0A1A2E 100%)",
+    fg: "#EAF2FF", muted: "#8FA8C8", accent: "#36D6E7", accent2: "#6C8CFF", line: "rgba(120,160,220,0.25)",
+    display: "system-ui, -apple-system, sans-serif", body: "system-ui, sans-serif",
+    chart: ["#36D6E7","#6C8CFF","#A66CFF","#37E6A8","#FFC857"], eyebrow: "CONFIDENTIAL · 胡言研究院" },
+  "抽象搞怪": { variant: "abstract", bg: "linear-gradient(135deg,#FF5FA2 0%,#A24BFF 45%,#33C2FF 100%)",
+    fg: "#1A1030", muted: "rgba(26,16,48,0.65)", accent: "#FF2E93", accent2: "#FFD43B", line: "rgba(255,255,255,0.6)",
+    display: "'Comic Sans MS','Chalkboard SE', system-ui, sans-serif", body: "system-ui, sans-serif",
+    chart: ["#FF2E93","#FFD43B","#00E0C6","#7C4DFF","#FF8A3D"], eyebrow: "✦ 宇宙真理研究分院 ✦" },
+};
+
+function Seal({ color }) {
+  const c = color || C.seal;
   return (
-    <div style={{ width: 44, height: 44, borderRadius: "50%", border: `1.5px solid ${C.seal}`, color: C.seal, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "serif", fontSize: 9, lineHeight: 1.1, textAlign: "center", letterSpacing: "0.04em", opacity: 0.85, flexShrink: 0 }}>
-      胡言<br />研究院
+    <div style={{ width: 46, height: 46, borderRadius: "50%", border: `1.5px solid ${c}`, color: c,
+      display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "serif", fontSize: 9,
+      lineHeight: 1.1, textAlign: "center", letterSpacing: "0.04em", opacity: 0.9, flexShrink: 0,
+      transform: "rotate(-8deg)" }}>胡言<br />研究院</div>
+  );
+}
+
+function Decor({ T }) {
+  if (T.variant === "business")
+    return (<React.Fragment>
+      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(120,160,220,0.07) 1px,transparent 1px),linear-gradient(90deg,rgba(120,160,220,0.07) 1px,transparent 1px)", backgroundSize: "38px 38px", zIndex: 0 }} />
+      <div style={{ position: "absolute", top: -120, right: -100, width: 360, height: 360, borderRadius: "50%", background: "radial-gradient(circle,rgba(54,214,231,0.30),transparent 65%)", filter: "blur(20px)", zIndex: 0 }} />
+    </React.Fragment>);
+  if (T.variant === "abstract")
+    return (<React.Fragment>
+      <div style={{ position: "absolute", top: -60, left: -50, width: 240, height: 240, borderRadius: "50%", background: "#FFD43B", opacity: 0.5, filter: "blur(8px)", zIndex: 0 }} />
+      <div style={{ position: "absolute", bottom: -70, right: -40, width: 220, height: 220, borderRadius: "50%", background: "#00E0C6", opacity: 0.45, filter: "blur(6px)", zIndex: 0 }} />
+      <div style={{ position: "absolute", top: "40%", right: "12%", width: 70, height: 70, background: "#7C4DFF", opacity: 0.5, transform: "rotate(20deg)", borderRadius: 14, zIndex: 0 }} />
+    </React.Fragment>);
+  return null;
+}
+
+function Header({ T, eyebrow }) {
+  const v = T.variant;
+  const eb = eyebrow || T.eyebrow;
+  if (v === "academic")
+    return (<div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", position: "relative", zIndex: 2 }}>
+      <div style={{ fontSize: "clamp(9px,1.1vw,12px)", letterSpacing: "0.22em", color: T.accent2, fontWeight: 600 }}>{eb}</div>
+      <Seal color={T.accent} />
+    </div>);
+  if (v === "gov")
+    return (<div style={{ textAlign: "center", position: "relative", zIndex: 2 }}>
+      <div style={{ fontFamily: T.display, color: T.accent, fontWeight: 700, fontSize: "clamp(11px,1.5vw,15px)", letterSpacing: "0.3em" }}>胡 言 研 究 院 文 件</div>
+      <div style={{ color: T.accent, fontSize: "clamp(9px,1.1vw,12px)", marginTop: 4 }}>{eb}</div>
+      <div style={{ borderTop: `3px solid ${T.accent}`, marginTop: 8 }} />
+      <div style={{ borderTop: `1px solid ${T.accent}`, marginTop: 2 }} />
+    </div>);
+  if (v === "ted")
+    return (<div style={{ position: "relative", zIndex: 2 }}>
+      <div style={{ fontWeight: 800, fontSize: "clamp(13px,1.8vw,18px)", letterSpacing: "0.02em" }}>
+        <span style={{ color: T.accent }}>TEDx</span><span style={{ color: T.fg, opacity: 0.85 }}> 胡言研究院</span>
+      </div>
+      <div style={{ width: 46, height: 3, background: T.accent, marginTop: 6 }} />
+    </div>);
+  if (v === "business")
+    return (<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative", zIndex: 2 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ width: 8, height: 8, borderRadius: "50%", background: T.accent, boxShadow: `0 0 10px ${T.accent}` }} />
+        <span style={{ fontSize: "clamp(9px,1.1vw,12px)", letterSpacing: "0.22em", color: T.muted, fontWeight: 600 }}>{eb}</span>
+      </div>
+      <span style={{ fontSize: "clamp(9px,1.1vw,12px)", color: T.muted, letterSpacing: "0.1em" }}>胡言研究院</span>
+    </div>);
+  // abstract
+  return (<div style={{ textAlign: "center", position: "relative", zIndex: 2 }}>
+    <span style={{ display: "inline-block", background: "#fff", color: T.accent, fontWeight: 800, padding: "5px 14px", borderRadius: 999, fontSize: "clamp(10px,1.3vw,14px)", transform: "rotate(-1.5deg)", boxShadow: "0 6px 16px -8px rgba(0,0,0,0.4)" }}>{eb}</span>
+  </div>);
+}
+
+function Footer({ T, note, pageNo }) {
+  const v = T.variant;
+  if (v === "gov")
+    return (<div style={{ textAlign: "center", color: T.accent, fontFamily: T.display, fontSize: "clamp(9px,1.1vw,12px)", position: "relative", zIndex: 2 }}>— {pageNo.split(" / ")[0]} —</div>);
+  if (v === "ted")
+    return (<div style={{ textAlign: "right", color: T.muted, fontSize: "clamp(8px,1vw,11px)", position: "relative", zIndex: 2 }}>{pageNo}</div>);
+  const lineStyle = v === "business"
+    ? { borderTop: "1px solid", borderImage: `linear-gradient(90deg,${T.accent},${T.accent2}) 1`, paddingTop: 9 }
+    : { borderTop: `1px solid ${T.line}`, paddingTop: 9 };
+  return (<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "clamp(8px,1vw,11px)", color: T.muted, position: "relative", zIndex: 2, ...lineStyle }}>
+    <span>{note || "本资料数据均为本院自行编造，请勿外传，更勿当真"}</span>
+    <span style={{ fontFamily: v === "business" ? "ui-monospace,monospace" : "serif" }}>{pageNo}</span>
+  </div>);
+}
+
+function SlideFrame({ children, footerNote, index, total, eyebrow, T, bare }) {
+  const v = T.variant;
+  const pageNo = String(index).padStart(2, "0") + " / " + String(total).padStart(2, "0");
+  let panel = null;
+  if (!bare && v === "abstract") panel = { background: "#fff", borderRadius: 24, padding: "clamp(16px,3vw,32px)", boxShadow: "0 22px 60px -22px rgba(0,0,0,0.4)", transform: "rotate(-0.6deg)", width: "100%" };
+  if (!bare && v === "business") panel = { background: "rgba(255,255,255,0.045)", border: `1px solid ${T.line}`, borderRadius: 16, padding: "clamp(16px,3vw,28px)", width: "100%" };
+  return (
+    <div style={{ position: "relative", width: "100%", aspectRatio: "16 / 9", background: T.bg, color: T.fg, boxShadow: "0 18px 50px -22px rgba(22,32,46,0.45)", display: "flex", flexDirection: "column", padding: "clamp(18px,3.6vw,46px)", overflow: "hidden", fontFamily: T.body }}>
+      <Decor T={T} />
+      <Header T={T} eyebrow={eyebrow} />
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", justifyContent: "center", position: "relative", zIndex: 2 }}>
+        {panel ? <div style={panel}>{children}</div> : children}
+      </div>
+      <Footer T={T} note={footerNote} pageNo={pageNo} />
     </div>
   );
 }
-function SlideFrame({ children, footerNote, index, total, eyebrow }) {
+
+function SlideTitle({ children, T }) {
+  const ruleBg = T.variant === "abstract" ? `linear-gradient(90deg,${T.accent},${T.accent2})` : T.accent;
   return (
-    <div style={{ position: "relative", width: "100%", aspectRatio: "16 / 9", background: C.white, color: C.ink, boxShadow: "0 18px 50px -22px rgba(22,32,46,0.4)", display: "flex", flexDirection: "column", padding: "clamp(20px, 4vw, 52px)", overflow: "hidden" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div style={{ fontSize: "clamp(9px,1.1vw,12px)", letterSpacing: "0.22em", color: C.blue, fontWeight: 600 }}>{eyebrow || "胡言研究院 · 内部资料"}</div>
-        <Seal />
-      </div>
-      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", justifyContent: "center" }}>{children}</div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${C.line}`, paddingTop: 10, fontSize: "clamp(8px,1vw,11px)", color: C.muted }}>
-        <span>{footerNote || "本资料数据均为本院自行编造，请勿外传，更勿当真"}</span>
-        <span style={{ fontFamily: "serif" }}>{String(index).padStart(2, "0")} / {String(total).padStart(2, "0")}</span>
-      </div>
+    <div style={{ marginBottom: "clamp(12px,2vw,22px)" }}>
+      <div style={{ width: T.variant === "ted" ? 56 : 42, height: T.variant === "ted" ? 5 : 3, background: ruleBg, marginBottom: 12, borderRadius: 2 }} />
+      <h2 style={{ fontFamily: T.display, fontWeight: T.variant === "ted" ? 800 : 700, fontSize: "clamp(20px,3.4vw,38px)", margin: 0, lineHeight: 1.2, color: T.fg }}>{children}</h2>
     </div>
   );
 }
+
 function Cover({ deck, index, total }) {
+  const T = themeOf(deck);
+  const v = T.variant;
+  const title = (
+    <h1 style={{ fontFamily: T.display, fontWeight: v === "ted" || v === "business" ? 800 : 700, color: T.fg, fontSize: "clamp(28px,5.4vw,60px)", lineHeight: 1.1, margin: 0,
+      ...(v === "business" ? { background: `linear-gradient(90deg,${T.accent},${T.accent2})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" } : {}),
+      ...(v === "abstract" ? { transform: "rotate(-1deg)" } : {}) }}>{deck.title}</h1>
+  );
+  if (v === "gov")
+    return (
+      <SlideFrame index={index} total={total} T={T} bare footerNote="此件公开（实为虚构）">
+        <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "clamp(10px,2vw,20px)" }}>
+          {title}
+          {deck.subtitle && <p style={{ fontFamily: T.display, fontSize: "clamp(13px,1.8vw,20px)", color: T.fg, margin: 0 }}>{deck.subtitle}</p>}
+          <div style={{ marginTop: 10, position: "relative" }}>
+            <div style={{ width: 92, height: 92, borderRadius: "50%", border: `3px solid ${T.accent}`, color: T.accent, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: T.display, fontWeight: 700, fontSize: 13, textAlign: "center", lineHeight: 1.3, transform: "rotate(-12deg)", opacity: 0.9 }}>胡言研究院<br />专用章</div>
+          </div>
+          <p style={{ fontFamily: T.display, fontSize: "clamp(11px,1.3vw,15px)", color: T.muted, margin: 0 }}>{deck.presenter || "胡言研究院"}</p>
+        </div>
+      </SlideFrame>
+    );
   return (
-    <SlideFrame index={index} total={total} eyebrow="胡言研究院 · 年度汇报" footerNote="严肃声明：以下内容不具备任何参考价值">
-      <div style={{ display: "flex", flexDirection: "column", gap: "clamp(10px,2vw,18px)" }}>
-        <div style={{ width: 60, height: 3, background: C.seal }} />
-        <h1 style={{ fontFamily: "serif", fontWeight: 700, color: C.ink, fontSize: "clamp(26px,5vw,56px)", lineHeight: 1.12, margin: 0 }}>{deck.title}</h1>
-        {deck.subtitle && <p style={{ fontSize: "clamp(13px,1.8vw,20px)", color: C.muted, margin: 0, lineHeight: 1.5 }}>{deck.subtitle}</p>}
-        <p style={{ fontSize: "clamp(11px,1.3vw,15px)", color: C.blue, margin: "8px 0 0", fontWeight: 600 }}>{deck.presenter || "胡言研究院"}</p>
+    <SlideFrame index={index} total={total} T={T} bare eyebrow={v === "academic" ? "胡言研究院 · 年度汇报" : undefined} footerNote={v === "academic" ? "严肃声明：以下内容不具备任何参考价值" : undefined}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "clamp(10px,2vw,18px)", alignItems: v === "ted" ? "flex-start" : (v === "abstract" ? "center" : "flex-start"), textAlign: v === "abstract" ? "center" : "left" }}>
+        {v !== "ted" && <div style={{ width: 60, height: 4, background: v === "abstract" ? `linear-gradient(90deg,${T.accent},${T.accent2})` : T.accent, borderRadius: 2 }} />}
+        {v === "abstract"
+          ? <div style={{ background: "#fff", borderRadius: 22, padding: "clamp(16px,3vw,30px)", transform: "rotate(-1.2deg)", boxShadow: "0 22px 60px -22px rgba(0,0,0,0.4)" }}>{title}{deck.subtitle && <p style={{ fontSize: "clamp(13px,1.8vw,20px)", color: T.muted, margin: "10px 0 0" }}>{deck.subtitle}</p>}</div>
+          : <React.Fragment>{title}{deck.subtitle && <p style={{ fontSize: "clamp(13px,1.8vw,20px)", color: T.muted, margin: 0, lineHeight: 1.5 }}>{deck.subtitle}</p>}</React.Fragment>}
+        <p style={{ fontSize: "clamp(11px,1.3vw,15px)", color: v === "business" ? T.accent : (v === "ted" ? T.accent : T.accent2), margin: "8px 0 0", fontWeight: 700 }}>{deck.presenter || "胡言研究院"}</p>
       </div>
     </SlideFrame>
   );
 }
-function SlideTitle({ children }) {
+
+function Agenda({ slide, index, total, T }) {
   return (
-    <div style={{ marginBottom: "clamp(12px,2vw,22px)" }}>
-      <div style={{ width: 40, height: 3, background: C.seal, marginBottom: 12 }} />
-      <h2 style={{ fontFamily: "serif", fontWeight: 700, fontSize: "clamp(20px,3.4vw,38px)", margin: 0, lineHeight: 1.2 }}>{children}</h2>
-    </div>
-  );
-}
-function Agenda({ slide, index, total }) {
-  return (
-    <SlideFrame index={index} total={total}>
-      <SlideTitle>{slide.title || "汇报提纲"}</SlideTitle>
+    <SlideFrame index={index} total={total} T={T}>
+      <SlideTitle T={T}>{slide.title || "汇报提纲"}</SlideTitle>
       <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "clamp(8px,1.4vw,14px)" }}>
         {(slide.items || []).map((it, i) => (
           <li key={i} style={{ display: "flex", gap: 16, alignItems: "baseline" }}>
-            <span style={{ fontFamily: "serif", color: C.gold, fontSize: "clamp(16px,2.4vw,26px)", fontWeight: 700, minWidth: 34 }}>{String(i + 1).padStart(2, "0")}</span>
-            <span style={{ fontSize: "clamp(13px,1.8vw,21px)", color: C.ink }}>{it}</span>
+            <span style={{ fontFamily: T.display, color: T.accent, fontSize: "clamp(16px,2.4vw,26px)", fontWeight: 800, minWidth: 36 }}>{String(i + 1).padStart(2, "0")}</span>
+            <span style={{ fontSize: "clamp(13px,1.8vw,21px)", color: T.fg }}>{it}</span>
           </li>
         ))}
       </ol>
     </SlideFrame>
   );
 }
-function Bullets({ slide, index, total }) {
+
+function Bullets({ slide, index, total, T }) {
+  const dot = T.variant === "ted" ? T.accent : (T.variant === "business" ? T.accent : T.accent2);
   return (
-    <SlideFrame index={index} total={total} footerNote={slide.footnote}>
-      <SlideTitle>{slide.title}</SlideTitle>
+    <SlideFrame index={index} total={total} T={T} footerNote={slide.footnote}>
+      <SlideTitle T={T}>{slide.title}</SlideTitle>
       <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "clamp(9px,1.5vw,16px)" }}>
         {(slide.bullets || []).map((b, i) => (
           <li key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-            <span style={{ width: 8, height: 8, borderRadius: 2, background: C.blue, marginTop: "0.5em", flexShrink: 0, transform: "rotate(45deg)" }} />
-            <span style={{ fontSize: "clamp(13px,1.9vw,22px)", color: C.ink, lineHeight: 1.45 }}>{b}</span>
+            <span style={{ width: 9, height: 9, borderRadius: T.variant === "abstract" ? "50%" : 2, background: dot, marginTop: "0.45em", flexShrink: 0, transform: T.variant === "abstract" ? "none" : "rotate(45deg)" }} />
+            <span style={{ fontSize: "clamp(13px,1.9vw,22px)", color: T.fg, lineHeight: 1.45 }}>{b}</span>
           </li>
         ))}
       </ul>
     </SlideFrame>
   );
 }
-function Stat({ slide, index, total }) {
+
+function Stat({ slide, index, total, T }) {
+  const v = T.variant;
+  const numStyle = { fontFamily: v === "business" ? "ui-monospace,system-ui,sans-serif" : T.display, fontWeight: 800, fontSize: "clamp(54px,12vw,140px)", lineHeight: 0.95, color: T.accent };
+  if (v === "business") { numStyle.background = `linear-gradient(90deg,${T.accent},${T.accent2})`; numStyle.WebkitBackgroundClip = "text"; numStyle.WebkitTextFillColor = "transparent"; numStyle.backgroundClip = "text"; }
+  if (v === "abstract") numStyle.textShadow = `4px 4px 0 ${T.accent2}`;
   return (
-    <SlideFrame index={index} total={total}>
+    <SlideFrame index={index} total={total} T={T}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "clamp(8px,1.4vw,16px)" }}>
-        <div style={{ fontFamily: "serif", fontWeight: 700, color: C.seal, fontSize: "clamp(54px,12vw,140px)", lineHeight: 0.95 }}>{slide.stat}</div>
-        <div style={{ fontSize: "clamp(15px,2.4vw,28px)", color: C.ink, fontWeight: 600, maxWidth: "85%" }}>{slide.label}</div>
-        {slide.sub && <div style={{ fontSize: "clamp(11px,1.5vw,17px)", color: C.muted, maxWidth: "70%" }}>{slide.sub}</div>}
+        <div style={numStyle}>{slide.stat}</div>
+        <div style={{ fontSize: "clamp(15px,2.4vw,28px)", color: T.fg, fontWeight: 600, maxWidth: "85%" }}>{slide.label}</div>
+        {slide.sub && <div style={{ fontSize: "clamp(11px,1.5vw,17px)", color: T.muted, maxWidth: "70%" }}>{slide.sub}</div>}
       </div>
     </SlideFrame>
   );
 }
-function ChartSlide({ slide, index, total }) {
+
+function ChartSlide({ slide, index, total, T }) {
   const data = (slide.data || []).map((d) => ({ name: String(d.name), value: Number(d.value) || 0 }));
   const type = slide.chartType || "bar";
   const ok = ResponsiveContainer && BarChart;
+  const cols = T.chart;
+  const tipBg = T.variant === "ted" ? "#161616" : (T.variant === "business" ? "#0E2138" : "#fff");
+  const tipFg = (T.variant === "ted" || T.variant === "business") ? "#fff" : "#16202E";
   return (
-    <SlideFrame index={index} total={total} footerNote={slide.source || "（数据来源：本院自行编造）"}>
-      <SlideTitle>{slide.title}</SlideTitle>
+    <SlideFrame index={index} total={total} T={T} footerNote={slide.source || "（数据来源：本院自行编造）"}>
+      <SlideTitle T={T}>{slide.title}</SlideTitle>
       <div style={{ flex: 1, minHeight: 0, display: "flex", gap: 20, alignItems: "stretch" }}>
         <div style={{ flex: 1, minHeight: 140 }}>
           {ok ? (
             <ResponsiveContainer width="100%" height="100%">
               {type === "line" ? (
                 <LineChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: -8 }}>
-                  <CartesianGrid stroke={C.line} strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: C.muted }} axisLine={{ stroke: C.line }} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: C.muted }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: `1px solid ${C.line}` }} />
-                  <Line type="monotone" dataKey="value" stroke={C.seal} strokeWidth={2.5} dot={{ r: 3, fill: C.seal }} />
+                  <CartesianGrid stroke={T.line} strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: T.muted }} axisLine={{ stroke: T.line }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: T.muted }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: `1px solid ${T.line}`, background: tipBg, color: tipFg }} />
+                  <Line type="monotone" dataKey="value" stroke={cols[0]} strokeWidth={3} dot={{ r: 3, fill: cols[0] }} />
                 </LineChart>
               ) : type === "pie" ? (
                 <PieChart>
-                  <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius="78%" label={{ fontSize: 11 }}>
-                    {data.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                  <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius="80%" label={{ fontSize: 11, fill: T.fg }}>
+                    {data.map((_, i) => <Cell key={i} fill={cols[i % cols.length]} />)}
                   </Pie>
-                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: `1px solid ${C.line}` }} />
+                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: `1px solid ${T.line}`, background: tipBg, color: tipFg }} />
                 </PieChart>
               ) : (
                 <BarChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: -8 }}>
-                  <CartesianGrid stroke={C.line} strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: C.muted }} axisLine={{ stroke: C.line }} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: C.muted }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: `1px solid ${C.line}` }} cursor={{ fill: "rgba(46,90,136,0.06)" }} />
-                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                    {data.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                  <CartesianGrid stroke={T.line} strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: T.muted }} axisLine={{ stroke: T.line }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: T.muted }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: `1px solid ${T.line}`, background: tipBg, color: tipFg }} cursor={{ fill: "rgba(127,127,127,0.08)" }} />
+                  <Bar dataKey="value" radius={[5, 5, 0, 0]}>
+                    {data.map((_, i) => <Cell key={i} fill={cols[i % cols.length]} />)}
                   </Bar>
                 </BarChart>
               )}
             </ResponsiveContainer>
-          ) : (
-            <div style={{ color: C.muted, fontSize: 13 }}>（图表组件未加载）</div>
-          )}
+          ) : <div style={{ color: T.muted, fontSize: 13 }}>（图表组件未加载）</div>}
         </div>
         {slide.insight && (
-          <div style={{ width: "30%", minWidth: 120, borderLeft: `2px solid ${C.gold}`, paddingLeft: 14, display: "flex", alignItems: "center" }}>
-            <p style={{ fontSize: "clamp(11px,1.5vw,17px)", color: C.ink, lineHeight: 1.5, margin: 0 }}>
-              <span style={{ color: C.gold, fontWeight: 700, display: "block", fontSize: "0.85em", letterSpacing: "0.1em", marginBottom: 6 }}>关键洞察</span>
+          <div style={{ width: "30%", minWidth: 120, borderLeft: `2px solid ${T.accent2}`, paddingLeft: 14, display: "flex", alignItems: "center" }}>
+            <p style={{ fontSize: "clamp(11px,1.5vw,17px)", color: T.fg, lineHeight: 1.5, margin: 0 }}>
+              <span style={{ color: T.accent2, fontWeight: 700, display: "block", fontSize: "0.85em", letterSpacing: "0.1em", marginBottom: 6 }}>关键洞察</span>
               {slide.insight}
             </p>
           </div>
@@ -418,44 +548,52 @@ function ChartSlide({ slide, index, total }) {
     </SlideFrame>
   );
 }
-function Quote({ slide, index, total }) {
+
+function Quote({ slide, index, total, T }) {
   return (
-    <SlideFrame index={index} total={total}>
-      <div style={{ display: "flex", flexDirection: "column", gap: "clamp(12px,2vw,22px)", maxWidth: "92%" }}>
-        <span style={{ fontFamily: "serif", color: C.line, fontSize: "clamp(50px,8vw,90px)", lineHeight: 0.6, height: "0.4em" }}>“</span>
-        <p style={{ fontFamily: "serif", fontSize: "clamp(18px,3.2vw,36px)", color: C.ink, lineHeight: 1.3, margin: 0, fontStyle: "italic" }}>{slide.quote}</p>
-        <p style={{ fontSize: "clamp(12px,1.6vw,18px)", color: C.blue, margin: 0, fontWeight: 600 }}>{slide.attrib}</p>
+    <SlideFrame index={index} total={total} T={T}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "clamp(12px,2vw,22px)", maxWidth: "94%", alignItems: T.variant === "abstract" ? "center" : "flex-start", textAlign: T.variant === "abstract" ? "center" : "left", margin: T.variant === "abstract" ? "0 auto" : 0 }}>
+        <span style={{ fontFamily: "Georgia, serif", color: T.accent, fontSize: "clamp(54px,9vw,100px)", lineHeight: 0.6, height: "0.4em", opacity: 0.85 }}>“</span>
+        <p style={{ fontFamily: T.display, fontSize: "clamp(20px,3.6vw,40px)", color: T.fg, lineHeight: 1.28, margin: 0, fontWeight: T.variant === "ted" ? 700 : 500, fontStyle: T.variant === "academic" ? "italic" : "normal" }}>{slide.quote}</p>
+        <p style={{ fontSize: "clamp(12px,1.6vw,18px)", color: T.accent, margin: 0, fontWeight: 700 }}>{slide.attrib}</p>
       </div>
     </SlideFrame>
   );
 }
-function Conclusion({ slide, index, total }) {
+
+function Conclusion({ slide, index, total, T }) {
+  const mark = T.variant === "abstract" ? "★" : (T.variant === "gov" ? "●" : "✓");
   return (
-    <SlideFrame index={index} total={total} eyebrow="胡言研究院 · 结论">
-      <SlideTitle>{slide.title || "结论与展望"}</SlideTitle>
+    <SlideFrame index={index} total={total} T={T} eyebrow={T.variant === "academic" ? "胡言研究院 · 结论" : undefined}>
+      <SlideTitle T={T}>{slide.title || "结论与展望"}</SlideTitle>
       <div style={{ display: "flex", flexDirection: "column", gap: "clamp(10px,1.6vw,16px)" }}>
         {(slide.points || []).map((p, i) => (
           <div key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-            <span style={{ fontFamily: "serif", color: C.seal, fontWeight: 700, fontSize: "clamp(15px,2vw,22px)" }}>✓</span>
-            <span style={{ fontSize: "clamp(13px,1.9vw,22px)", color: C.ink, lineHeight: 1.45 }}>{p}</span>
+            <span style={{ color: T.accent, fontWeight: 700, fontSize: "clamp(15px,2vw,22px)", fontFamily: T.display }}>{mark}</span>
+            <span style={{ fontSize: "clamp(13px,1.9vw,22px)", color: T.fg, lineHeight: 1.45 }}>{p}</span>
           </div>
         ))}
       </div>
     </SlideFrame>
   );
 }
-function Thanks({ index, total }) {
+
+function Thanks({ index, total, T }) {
+  const big = { fontFamily: T.display, fontSize: "clamp(34px,6vw,72px)", margin: 0, color: T.fg, fontWeight: T.variant === "ted" || T.variant === "business" ? 800 : 700 };
+  if (T.variant === "business") { big.background = `linear-gradient(90deg,${T.accent},${T.accent2})`; big.WebkitBackgroundClip = "text"; big.WebkitTextFillColor = "transparent"; big.backgroundClip = "text"; }
   return (
-    <SlideFrame index={index} total={total} eyebrow="胡言研究院" footerNote="如有雷同，纯属巧合；如觉有理，纯属错觉">
+    <SlideFrame index={index} total={total} T={T} bare footerNote={T.variant === "academic" ? "如有雷同，纯属巧合；如觉有理，纯属错觉" : undefined}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 14 }}>
-        <h2 style={{ fontFamily: "serif", fontSize: "clamp(34px,6vw,72px)", margin: 0, color: C.ink }}>谢 谢 聆 听</h2>
-        <p style={{ color: C.muted, fontSize: "clamp(12px,1.6vw,18px)", margin: 0 }}>欢迎提问，本院保证答非所问</p>
+        <h2 style={big}>谢 谢 聆 听</h2>
+        <p style={{ color: T.muted, fontSize: "clamp(12px,1.6vw,18px)", margin: 0 }}>欢迎提问，本院保证答非所问</p>
       </div>
     </SlideFrame>
   );
 }
+
 function renderSlide(slide, index, total, deck) {
-  const c = { slide, index, total };
+  const T = themeOf(deck);
+  const c = { slide, index, total, T };
   switch (slide.type) {
     case "cover": return <Cover deck={deck} index={index} total={total} />;
     case "agenda": return <Agenda {...c} />;
@@ -463,7 +601,7 @@ function renderSlide(slide, index, total, deck) {
     case "chart": return <ChartSlide {...c} />;
     case "quote": return <Quote {...c} />;
     case "conclusion": return <Conclusion {...c} />;
-    case "thanks": return <Thanks index={index} total={total} />;
+    case "thanks": return <Thanks index={index} total={total} T={T} />;
     default: return <Bullets {...c} />;
   }
 }
