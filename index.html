@@ -145,7 +145,8 @@ const PERSONA =
   "引用编造的学者、机构、期刊；因果链荒谬但形式自洽（多用『由于…因此必然…』『数据表明…』）；" +
   "全程严肃克制，不用网络梗、不加 emoji、绝不自己拆穿笑点——越正经越好笑。" +
   "只输出严格合法的 JSON，不要任何解释或 markdown 代码块。" +
-  "重要：所有文字内容里如果需要引号，一律使用中文「」或『』，绝对不要在文字里使用英文双引号，否则会破坏 JSON。不要有多余的逗号，不要在字符串值里换行。";
+  "重要：所有文字内容里如果需要引号，一律使用中文「」或『』，绝对不要在文字里使用英文双引号，否则会破坏 JSON。不要有多余的逗号，不要在字符串值里换行。" +
+  "篇幅必须克制：每页只保留最关键的少量文字，要点用短句，绝不写满整页，字数宁少勿多。";
 
 const SCHEMA =
   "每一页是以下类型之一：\n" +
@@ -250,7 +251,7 @@ async function generateBatch({ topic, style, absurdity, audience, meta, outline,
     `完整提纲如下：\n${outlineText}\n\n` +
     `现在请只写第 ${start + 1} 到 ${start + slice.length} 页的完整内容，严格按各页的 type 和要点展开。\n` +
     `${SCHEMA}\n` +
-    `chart 的 data 给 4-6 项且数字有起伏；文字精炼，每条不超过 30 字。\n` +
+    `严格控制篇幅，宁少勿多：bullets 最多 3 条且每条≤16字；agenda 最多 4 条且每条≤12字；stat 的 label≤14字、sub≤20字；chart 的 insight≤22字、data 给 4-6 项且数字有起伏；quote≤24字；conclusion 最多 3 条且每条≤18字。\n` +
     `只输出这 ${slice.length} 页，返回一个 JSON 数组，每个元素是一页完整对象，顺序与提纲一致。`;
   const arr = await callJSON(sys, usr, 1600, cfg);
   const list = Array.isArray(arr) ? arr : (arr.slides || [arr]);
@@ -448,11 +449,11 @@ function Agenda({ slide, index, total, T }) {
   return (
     <SlideFrame index={index} total={total} T={T}>
       <SlideTitle T={T}>{slide.title || "汇报提纲"}</SlideTitle>
-      <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "clamp(8px,1.4vw,14px)" }}>
-        {(slide.items || []).map((it, i) => (
+      <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "clamp(6px,1.1vw,12px)" }}>
+        {(slide.items || []).slice(0, 4).map((it, i) => (
           <li key={i} style={{ display: "flex", gap: 16, alignItems: "baseline" }}>
             <span style={{ fontFamily: T.display, color: T.accent, fontSize: "clamp(16px,2.4vw,26px)", fontWeight: 800, minWidth: 36 }}>{String(i + 1).padStart(2, "0")}</span>
-            <span style={{ fontSize: "clamp(13px,1.8vw,21px)", color: T.fg }}>{it}</span>
+            <span style={{ fontSize: "clamp(12px,1.6vw,19px)", color: T.fg }}>{it}</span>
           </li>
         ))}
       </ol>
@@ -465,11 +466,11 @@ function Bullets({ slide, index, total, T }) {
   return (
     <SlideFrame index={index} total={total} T={T} footerNote={slide.footnote}>
       <SlideTitle T={T}>{slide.title}</SlideTitle>
-      <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "clamp(9px,1.5vw,16px)" }}>
-        {(slide.bullets || []).map((b, i) => (
+      <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "clamp(7px,1.2vw,13px)" }}>
+        {(slide.bullets || []).slice(0, 4).map((b, i) => (
           <li key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
             <span style={{ width: 9, height: 9, borderRadius: T.variant === "abstract" ? "50%" : 2, background: dot, marginTop: "0.45em", flexShrink: 0, transform: T.variant === "abstract" ? "none" : "rotate(45deg)" }} />
-            <span style={{ fontSize: "clamp(13px,1.9vw,22px)", color: T.fg, lineHeight: 1.45 }}>{b}</span>
+            <span style={{ fontSize: "clamp(12px,1.7vw,20px)", color: T.fg, lineHeight: 1.45 }}>{b}</span>
           </li>
         ))}
       </ul>
@@ -566,11 +567,11 @@ function Conclusion({ slide, index, total, T }) {
   return (
     <SlideFrame index={index} total={total} T={T} eyebrow={T.variant === "academic" ? "胡言研究院 · 结论" : undefined}>
       <SlideTitle T={T}>{slide.title || "结论与展望"}</SlideTitle>
-      <div style={{ display: "flex", flexDirection: "column", gap: "clamp(10px,1.6vw,16px)" }}>
-        {(slide.points || []).map((p, i) => (
+      <div style={{ display: "flex", flexDirection: "column", gap: "clamp(8px,1.3vw,13px)" }}>
+        {(slide.points || []).slice(0, 3).map((p, i) => (
           <div key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
             <span style={{ color: T.accent, fontWeight: 700, fontSize: "clamp(15px,2vw,22px)", fontFamily: T.display }}>{mark}</span>
-            <span style={{ fontSize: "clamp(13px,1.9vw,22px)", color: T.fg, lineHeight: 1.45 }}>{p}</span>
+            <span style={{ fontSize: "clamp(12px,1.7vw,20px)", color: T.fg, lineHeight: 1.45 }}>{p}</span>
           </div>
         ))}
       </div>
