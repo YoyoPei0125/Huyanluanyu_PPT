@@ -11,15 +11,22 @@
   #root { min-height: 100vh; }
   button { font-family: inherit; }
 </style>
-<!-- CDN 依赖：React / ReactDOM / PropTypes / Recharts / Babel(浏览器内编译 JSX) -->
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/prop-types@15/prop-types.min.js"></script>
-<script crossorigin src="https://unpkg.com/recharts@2.12.7/umd/Recharts.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- 外部依赖由页面底部的"多源加载器"按备用顺序加载，提升弱网/被墙环境下的成功率 -->
 </head>
 <body>
 <div id="root"></div>
+<div id="boot" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;font-family:system-ui,sans-serif;color:#6C6A61;text-align:center;line-height:1.7">
+  正在加载…<br><span style="font-size:13px">若长时间停在这里，多半是网络没加载出外部组件，请刷新或换个网络再试。</span>
+</div>
+<script>
+  // 兜底：脚本报错时把信息显示出来，而不是纯白屏
+  window.addEventListener("error", function (e) {
+    var b = document.getElementById("boot");
+    if (b && e && e.message && /import|module|Babel|is not defined/.test(e.message)) {
+      b.innerHTML = "加载出错了：<br><span style='font-size:13px;color:#A93A30'>" + (e.message || "") + "</span><br><span style='font-size:13px;color:#6C6A61'>请刷新，或换网络/浏览器重试。</span>";
+    }
+  });
+</script>
 
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useCallback, useRef } = React;
@@ -55,6 +62,14 @@ const AUDIENCE = [
   { id: "大众", label: "大众", hint: "正常难度" },
   { id: "烧脑", label: "烧脑", hint: "抽象术语拉满" },
 ];
+/* ===== 后端代理（可选，让访客无需自带 Key） =====
+   部署好 Cloudflare Worker 后，把它的地址填进 PROXY_URL，例如：
+   const PROXY_URL = "https://huyan.你的子域.workers.dev";
+   留空 = 维持"访客自带 Key"模式。详见 README 的"方式 D"。 */
+const PROXY_URL = "";
+const ACCESS_CODE = ""; // 如果 Worker 设了访问口令，这里填一样的
+const USING_PROXY = !!PROXY_URL;
+
 const MODELS = [
   { id: "claude-sonnet-4-6", label: "Sonnet（快 · 便宜 · 推荐）" },
   { id: "claude-haiku-4-5-20251001", label: "Haiku（最快最省）" },
@@ -193,27 +208,34 @@ function parseJson(raw) {
 }
 
 async function callAPI(system, user, maxTokens, cfg) {
-  if (!cfg.apiKey) throw new Error("还没填 API Key，点右上角『API 设置』填一下");
+  const url = USING_PROXY ? PROXY_URL : "https://api.anthropic.com/v1/messages";
+  const headers = { "content-type": "application/json" };
+  if (USING_PROXY) {
+    if (ACCESS_CODE) headers["x-access-code"] = ACCESS_CODE;
+  } else {
+    if (!cfg.apiKey) throw new Error("还没填 API Key，点右上角『API 设置』填一下");
+    headers["x-api-key"] = cfg.apiKey;
+    headers["anthropic-version"] = "2023-06-01";
+    headers["anthropic-dangerous-direct-browser-access"] = "true";
+  }
   let res;
   try {
-    res = await fetch("https://api.anthropic.com/v1/messages", {
+    res = await fetch(url, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": cfg.apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true",
-      },
+      headers,
       body: JSON.stringify({ model: cfg.model, max_tokens: maxTokens, system, messages: [{ role: "user", content: user }] }),
     });
   } catch (e) {
-    throw new Error("连不上 Anthropic（多半是被浏览器拦了）。建议用 GitHub Pages 或本地服务器打开，详见 README。");
+    throw new Error(USING_PROXY
+      ? "连不上后端代理，检查 PROXY_URL 是否填对、Worker 是否已部署。"
+      : "连不上 Anthropic（多半是被浏览器拦了）。建议用 GitHub Pages 或本地服务器打开，详见 README。");
   }
   if (!res.ok) {
     let msg = "请求失败（" + res.status + "）";
     try { const j = await res.json(); if (j.error && j.error.message) msg = j.error.message; } catch (e) {}
-    if (res.status === 401) msg = "API Key 不对或未授权（401）。请检查 Key。";
-    if (res.status === 400 && /model/.test(msg)) msg = "这个模型你的账号用不了，换一个模型试试（400）。";
+    if (res.status === 401) msg = USING_PROXY ? "代理拒绝了请求（401），可能是访问口令不对。" : "API Key 不对或未授权（401）。请检查 Key。";
+    if (res.status === 403) msg = "来源不被代理允许（403）。检查 Worker 的 ALLOWED_ORIGIN 设置。";
+    if (res.status === 400 && /model/.test(msg)) msg = "这个模型用不了，换一个模型试试（400）。";
     if (res.status === 429) msg = "太频繁或额度不足（429），等一下或检查账户余额。";
     throw new Error(msg);
   }
@@ -634,7 +656,7 @@ function App() {
     try {
       const k = localStorage.getItem("huyan_key"); if (k) setApiKey(k);
       const m = localStorage.getItem("huyan_model"); if (m) setModel(m);
-      if (!k) setShowSettings(true);
+      if (!k && !USING_PROXY) setShowSettings(true);
     } catch (e) {}
   }, []);
   useEffect(() => { try { localStorage.setItem("huyan_key", apiKey); } catch (e) {} }, [apiKey]);
@@ -652,7 +674,7 @@ function App() {
 
   const run = useCallback(async () => {
     const t = topic.trim();
-    if (!apiKey.trim()) { setShowSettings(true); setError("先在『API 设置』里填入你的 Key"); return; }
+    if (!USING_PROXY && !apiKey.trim()) { setShowSettings(true); setError("先在『API 设置』里填入你的 Key"); return; }
     if (!t) { setError("先给我一个主题"); return; }
     setError(""); setLoading(true); setDeck(null); setProgress({ label: "准备中…", pct: 2 });
     try {
@@ -722,19 +744,25 @@ function App() {
 
         {showSettings && (
           <div style={{ background: "#FFF8F0", border: `1px solid ${C.gold}`, borderRadius: 12, padding: 18, marginBottom: 20 }}>
-            <div style={{ fontWeight: 700, marginBottom: 8 }}>API 设置（只存在你自己的浏览器里）</div>
-            <label style={lbl}>Anthropic API Key</label>
-            <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-ant-..."
-              style={{ width: "100%", marginTop: 6, padding: "10px 12px", fontSize: 14, border: `1px solid ${C.line}`, borderRadius: 8, outline: "none" }} />
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>{USING_PROXY ? "设置" : "API 设置（只存在你自己的浏览器里）"}</div>
+            {USING_PROXY
+              ? <div style={{ fontSize: 13, color: C.muted, marginBottom: 4 }}>本站已配置后端代理，无需填写 Key，直接生成即可。</div>
+              : <React.Fragment>
+                  <label style={lbl}>Anthropic API Key</label>
+                  <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-ant-..."
+                    style={{ width: "100%", marginTop: 6, padding: "10px 12px", fontSize: 14, border: `1px solid ${C.line}`, borderRadius: 8, outline: "none" }} />
+                </React.Fragment>}
             <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
               <label style={lbl}>模型</label>
               <select value={model} onChange={(e) => setModel(e.target.value)} style={{ padding: "8px 10px", fontSize: 14, border: `1px solid ${C.line}`, borderRadius: 8 }}>
                 {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
               </select>
             </div>
-            <div style={{ fontSize: 12, color: C.muted, marginTop: 10, lineHeight: 1.6 }}>
-              在 console.anthropic.com 申请 Key。Key 只保存在本机浏览器，不会上传，也不要把它写进代码提交到 GitHub。每次生成会消耗少量 API 额度。
-            </div>
+            {!USING_PROXY && (
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 10, lineHeight: 1.6 }}>
+                在 console.anthropic.com 申请 Key。Key 只保存在本机浏览器，不会上传，也不要把它写进代码提交到 GitHub。每次生成会消耗少量 API 额度。
+              </div>
+            )}
           </div>
         )}
 
@@ -878,6 +906,73 @@ const ghostBtn = { padding: "9px 14px", fontSize: 13, color: C.white, background
 const navArrow = { position: "absolute", top: "50%", transform: "translateY(-50%)", width: 40, height: 40, borderRadius: "50%", border: `1px solid ${C.line}`, background: C.white, color: C.ink, fontSize: 22, cursor: "pointer", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", lineHeight: 1 };
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+var _boot = document.getElementById("boot"); if (_boot) _boot.remove();
+</script>
+<script>
+/* 多源加载器：每个依赖按顺序尝试多个 CDN，任一成功即用；全部加载完再编译运行 App */
+(function () {
+  var boot = document.getElementById("boot");
+  function setBoot(msg) { if (boot) boot.innerHTML = msg; }
+  setBoot("正在加载组件…<br><span style='font-size:13px'>首次打开较慢，请稍候（最多约 30 秒）</span>");
+
+  var deps = [
+    { name: "React", required: true, check: function () { return window.React; }, urls: [
+      "https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js",
+      "https://fastly.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js",
+      "https://unpkg.com/react@18.3.1/umd/react.production.min.js",
+      "https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js",
+      "https://cdn.staticfile.org/react/18.3.1/umd/react.production.min.js" ] },
+    { name: "ReactDOM", required: true, check: function () { return window.ReactDOM; }, urls: [
+      "https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js",
+      "https://fastly.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js",
+      "https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js",
+      "https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js",
+      "https://cdn.staticfile.org/react-dom/18.3.1/umd/react-dom.production.min.js" ] },
+    { name: "PropTypes", required: false, check: function () { return window.PropTypes; }, urls: [
+      "https://cdn.jsdelivr.net/npm/prop-types@15.8.1/prop-types.min.js",
+      "https://fastly.jsdelivr.net/npm/prop-types@15.8.1/prop-types.min.js",
+      "https://unpkg.com/prop-types@15.8.1/prop-types.min.js",
+      "https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js" ] },
+    { name: "Recharts", required: false, check: function () { return window.Recharts; }, urls: [
+      "https://cdn.jsdelivr.net/npm/recharts@2.12.7/umd/Recharts.min.js",
+      "https://fastly.jsdelivr.net/npm/recharts@2.12.7/umd/Recharts.min.js",
+      "https://unpkg.com/recharts@2.12.7/umd/Recharts.min.js",
+      "https://cdnjs.cloudflare.com/ajax/libs/recharts/2.12.7/Recharts.min.js" ] },
+    { name: "Babel", required: true, check: function () { return window.Babel; }, urls: [
+      "https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js",
+      "https://fastly.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js",
+      "https://unpkg.com/@babel/standalone@7.26.4/babel.min.js",
+      "https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js",
+      "https://cdn.staticfile.org/babel-standalone/7.26.4/babel.min.js" ] },
+  ];
+
+  function tryUrls(urls, i, done) {
+    if (i >= urls.length) { done(false); return; }
+    var s = document.createElement("script");
+    s.src = urls[i];
+    s.onload = function () { done(true); };
+    s.onerror = function () { tryUrls(urls, i + 1, done); };
+    document.head.appendChild(s);
+  }
+  function loadDep(dep, cb) {
+    if (dep.check()) { cb(true); return; }
+    tryUrls(dep.urls, 0, function () { cb(!!dep.check() || !dep.required); });
+  }
+  function chain(i) {
+    if (i >= deps.length) { run(); return; }
+    setBoot("正在加载组件… (" + (i + 1) + "/" + deps.length + ")<br><span style='font-size:13px'>首次打开较慢，请稍候</span>");
+    loadDep(deps[i], function (ok) {
+      if (!ok) { setBoot("「" + deps[i].name + "」没下载成功 😣<br><span style='font-size:13px'>多为网络问题：请刷新重试，或换个网络/浏览器（手机流量也行）。</span>"); return; }
+      chain(i + 1);
+    });
+  }
+  function run() {
+    if (!window.Babel) { setBoot("编译器没加载成功，请刷新或换网络重试。"); return; }
+    try { window.Babel.transformScriptTags(); }
+    catch (e) { setBoot("运行出错：<br><span style='font-size:13px;color:#A93A30'>" + (e.message || e) + "</span>"); }
+  }
+  chain(0);
+})();
 </script>
 </body>
 </html>
